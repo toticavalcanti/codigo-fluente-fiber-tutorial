@@ -1,14 +1,15 @@
 package main
 
-import "fmt"
+import "github.com/gofiber/fiber/v2"
 
 func main() {
-  word := "Hello!"
-  ptr := &word
-  fmt.Println(ptr) //O endereço de memória para o qual está apontando
-  fmt.Println(*ptr) //O valor armazenado no endereço de memória
+  app := fiber.New()
 
-  word = "World!"
-  fmt.Println(ptr) //O endereço de memória para o qual está apontando
-  fmt.Println(*ptr) //O valor armazenado no endereço de memória
+  app.Get("/", home)
+
+  app.Listen(":3000")
+}
+
+func home(c *fiber.Ctx) error {
+  return c.SendString("Hello, World 👋!")
 }
