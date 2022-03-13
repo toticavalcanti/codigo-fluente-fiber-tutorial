@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	var dsn = "root:mysql0401@/fluent_admin?charset=utf8mb4&parseTime=True&loc=Local"
+	var dsn = "root:mysql1234@/fluent_admin?charset=utf8mb4&parseTime=True&loc=Local"
 	var v = "Não conseguiu conectar ao banco de dados"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 
