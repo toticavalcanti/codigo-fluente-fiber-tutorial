@@ -14,7 +14,11 @@ git clone address repo
 ### Instaling dependencies
 
 ```
-go mod init
+go mod init nome_do_seu_modulo
+```
+And the command
+```
+go mod tidy
 ```
 
 ### Run the project
