@@ -13,10 +13,11 @@ git clone address repo
 
 ### Instaling dependencies
 
+To generate the dependecy file called go.mod
 ```
 go mod init nome_do_seu_modulo
 ```
-And the command
+And to generate go.sum the command
 ```
 go mod tidy
 ```
