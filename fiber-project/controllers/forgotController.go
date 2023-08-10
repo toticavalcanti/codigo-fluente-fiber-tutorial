@@ -4,6 +4,7 @@ import (
 	"fiber-project/database"
 	"fiber-project/models"
 	"math/rand"
+	"net/smtp"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -22,6 +23,22 @@ func Forgot(c *fiber.Ctx) error {
 	}
 
 	database.DB.Create(&passwordReset)
+
+	from := "fluentcode@exemple.com"
+
+	to := []string{
+		data["email"],
+	}
+
+	url := "http://localhost:3000/reset/" + token
+
+	message := []byte("Clique <a href=\"" + url + "\">aqui</a> para redefinir sua senha!")
+
+	err := smtp.SendMail("localhost:1025", nil, from, to, message)
+
+	if err != nil {
+		return err
+	}
 
 	return c.JSON(fiber.Map{
 		"message": "success",
