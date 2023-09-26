@@ -1,8 +1,8 @@
-# Project Login/Register User - Tutorial Fiber - C�digo Fluente
+# Project Login/Register User - Tutorial Fiber - C&oacute;digo Fluente
 
-[C&oacute;digo Fluente](https://www.codigofluente.com.br/)
+## [C&oacute;digo Fluente](https://www.codigofluente.com.br/)
 
-## Fiber tutorial repository
+## Fiber tutorial
 
 ## Description
 
