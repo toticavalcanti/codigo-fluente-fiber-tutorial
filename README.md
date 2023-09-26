@@ -39,7 +39,7 @@ go run main.go
 Toti Cavalcanti
 [@toticavalcanti](toticavalcanti@hotmail.com)
 
-ex. [C�digo Fluente](https://www.codigofluente.com.br/)
+ex. [C&oacute;digo Fluente](https://www.codigofluente.com.br/)
 
 ## Version History
 
