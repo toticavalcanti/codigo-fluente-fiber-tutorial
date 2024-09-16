@@ -3,7 +3,10 @@ package database
 import (
 	"fiber-project/models"
 	"fmt"
+	"log"
+	"os"
 
+	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -11,16 +14,23 @@ import (
 var DB *gorm.DB
 
 func Connect() {
-	var dsn = "toticavalcanti:mysql1234@/fluent_admin?charset=utf8mb4&parseTime=True&loc=Local"
-	var v = "Não conseguiu conectar ao banco de dados"
-	connection, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-
+	err := godotenv.Load("../.env") // Load .env file
 	if err != nil {
-		panic(v)
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	dsn := os.Getenv("DB_DSN") // Get DSN from environment variables
+	if dsn == "" {
+		log.Fatal("DB_DSN is not set in .env file")
+	}
+
+	connection, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic("Failed to connect to database")
 	}
 
 	DB = connection
 
 	connection.AutoMigrate(&models.User{}, &models.PasswordReset{})
-	fmt.Println("Conexão OK!")
+	fmt.Println("Database connection successful!")
 }
