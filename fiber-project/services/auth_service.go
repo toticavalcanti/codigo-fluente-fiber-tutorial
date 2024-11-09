@@ -3,6 +3,8 @@ package services
 import (
 	"fiber-project/database"
 	"fiber-project/models"
+	"os"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -15,20 +17,44 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
+var emailRegex = regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
+
 func Register(c *fiber.Ctx) error {
 	var data map[string]string
 
 	if err := c.BodyParser(&data); err != nil {
-		return err
-	}
-	if data["password"] != data["confirm_password"] {
-		c.Status(400)
-		return c.JSON(fiber.Map{
-			"message": "Passwords do not match!",
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid request data",
 		})
 	}
 
-	password, _ := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
+	// Validar email
+	if !emailRegex.MatchString(data["email"]) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid email format",
+		})
+	}
+
+	// Verificar se email já existe
+	var existingUser models.User
+	if err := database.DB.Where("email = ?", data["email"]).First(&existingUser).Error; err == nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"message": "Email already exists",
+		})
+	}
+
+	if data["password"] != data["confirm_password"] {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Passwords do not match",
+		})
+	}
+
+	password, err := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error processing password",
+		})
+	}
 
 	user := models.User{
 		FirstName: data["first_name"],
@@ -37,35 +63,34 @@ func Register(c *fiber.Ctx) error {
 		Password:  password,
 	}
 
-	database.DB.Create(&user)
-	return c.JSON(user)
-}
-
-func Login(c *fiber.Ctx) error {
-	//get the request parameter
-	var data map[string]string
-
-	if err := c.BodyParser(&data); err != nil {
-		return err
-	}
-
-	var user models.User
-	//get user by email
-	database.DB.Where("email = ?", data["email"]).First(&user)
-
-	//user not found
-	if user.Id == 0 {
-		c.Status(404)
-		return c.JSON(fiber.Map{
-			"message": "User not found!",
+	if err := database.DB.Create(&user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error creating user",
 		})
 	}
 
-	//incorrect password
+	return c.Status(fiber.StatusCreated).JSON(user)
+}
+
+func Login(c *fiber.Ctx) error {
+	var data map[string]string
+
+	if err := c.BodyParser(&data); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid request data",
+		})
+	}
+
+	var user models.User
+	if err := database.DB.Where("email = ?", data["email"]).First(&user).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "User not found",
+		})
+	}
+
 	if err := bcrypt.CompareHashAndPassword(user.Password, []byte(data["password"])); err != nil {
-		c.Status(400)
-		return c.JSON(fiber.Map{
-			"message": "Incorrect password!",
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Incorrect password",
 		})
 	}
 
@@ -74,10 +99,17 @@ func Login(c *fiber.Ctx) error {
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "secret" // fallback para desenvolvimento
+	}
+
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	token, err := jwtToken.SignedString([]byte("secret"))
+	token, err := jwtToken.SignedString([]byte(jwtSecret))
 	if err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error generating token",
+		})
 	}
 
 	cookie := fiber.Cookie{
@@ -85,45 +117,55 @@ func Login(c *fiber.Ctx) error {
 		Value:    token,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HTTPOnly: true,
+		Secure:   os.Getenv("ENV") == "production", // HTTPS apenas em produção
+		SameSite: "Lax",
 	}
 	c.Cookie(&cookie)
 	return c.JSON(fiber.Map{
 		"jwt": token,
 	})
-
 }
 
 func User(c *fiber.Ctx) error {
 	cookie := c.Cookies("jwt")
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "secret"
+	}
+
 	token, err := jwt.ParseWithClaims(cookie, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte("secret"), nil
+		return []byte(jwtSecret), nil
 	})
 
 	if err != nil || !token.Valid {
-		c.Status(fiber.StatusUnauthorized)
-		return c.JSON(fiber.Map{
-			"message": "unauthenticated",
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Unauthorized",
 		})
 	}
+
 	claims := token.Claims.(*Claims)
-	id := claims.Issuer
 	var user models.User
-	database.DB.Where("id = ?", id).First(&user)
+	if err := database.DB.Where("id = ?", claims.Issuer).First(&user).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"message": "User not found",
+		})
+	}
+
 	return c.JSON(user)
 }
 
 func Logout(c *fiber.Ctx) error {
 	cookie := fiber.Cookie{
-		//Definir o valor do cookie como vazio e adicionar uma data de expiração no passado.
-		Name:  "jwt",
-		Value: "",
-		//No código da função de logout, remover o cookie definindo o mesmo cookie no passado ( '-' ).
+		Name:     "jwt",
+		Value:    "",
 		Expires:  time.Now().Add(-time.Hour),
 		HTTPOnly: true,
+		Secure:   os.Getenv("ENV") == "production",
+		SameSite: "Lax",
 	}
 	c.Cookie(&cookie)
-	//Retornar uma resposta de sucesso em formato JSON.
 	return c.JSON(fiber.Map{
-		"message": "success",
+		"message": "Successfully logged out",
 	})
 }
