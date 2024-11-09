@@ -1,0 +1,24 @@
+root = "."  # Diretório raiz do projeto
+tmp_dir = "tmp"  # Onde os arquivos temporários serão armazenados
+
+[build]
+  # Comando para compilar o projeto
+  cmd = "go build -o ./tmp/main.exe ."
+  # Caminho do executável gerado
+  bin = "tmp/main.exe"
+  # Delay em milissegundos entre cada verificação de mudanças
+  delay = 1000
+  # Diretórios que serão ignorados
+  exclude_dir = ["assets", "tmp", "vendor"]
+  # Extensões de arquivo que serão monitoradas
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  # Arquivos de teste serão ignorados
+  exclude_regex = ["_test.go"]
+
+[screen]
+  # Limpa a tela quando recompila
+  clear_on_rebuild = true
+
+[misc]
+  # Limpa arquivos temporários ao sair
+  clean_on_exit = true
