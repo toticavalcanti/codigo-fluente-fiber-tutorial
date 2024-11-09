@@ -5,3 +5,4 @@ env_variables:
   DB_HOST: "seu-host-db"
   DB_USER: "seu-usuario"
   DB_DSN: "usuario:senha@tcp(host:3306)/nome-do-banco"
+  JWT_SECRET: "seu-segredo-muito-seguro-aqui"
