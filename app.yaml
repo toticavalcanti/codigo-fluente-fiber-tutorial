@@ -1,8 +1,17 @@
-runtime: go120  # ou a versão do Go que você está usando
+runtime: go120
+
 env_variables:
+  # Environment
   ENV: "production"
-  PORT: "8080"  # App Engine geralmente usa porta 8080
-  DB_HOST: "seu-host-db"
-  DB_USER: "seu-usuario"
+  PORT: "8080"
+  
+  # Database
   DB_DSN: "usuario:senha@tcp(host:3306)/nome-do-banco"
+  
+  # JWT
   JWT_SECRET: "seu-segredo-muito-seguro-aqui"
+  
+  # Email (Gmail)
+  GMAIL_EMAIL: "seu-email@gmail.com"
+  GMAIL_APP_PASSWORD: "sua-senha-de-aplicativo"
+  APP_URL: "https://seu-app.appspot.com"  # URL do seu app no Google Cloud
