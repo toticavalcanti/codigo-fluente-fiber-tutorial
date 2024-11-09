@@ -1,0 +1,5 @@
+runtime: go120  # ou a versão do Go que você está usando
+env_variables:
+  PORT: "8080"  # App Engine geralmente usa porta 8080
+  DB_HOST: "seu-host-db"
+  DB_USER: "seu-usuario"
