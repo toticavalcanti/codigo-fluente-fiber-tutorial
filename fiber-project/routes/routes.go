@@ -15,4 +15,13 @@ func Setup(app *fiber.App) {
 	api.Post("/logout", controllers.Logout)
 	api.Post("/forgot", controllers.Forgot)
 	api.Post("/reset", controllers.Reset)
+
+	// Health check route
+	api.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status":  "OK",
+			"service": "auth-api",
+			"version": "1.0.0",
+		})
+	})
 }
