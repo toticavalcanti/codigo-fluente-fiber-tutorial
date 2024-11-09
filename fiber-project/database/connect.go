@@ -14,23 +14,31 @@ import (
 var DB *gorm.DB
 
 func Connect() {
-	err := godotenv.Load("../.env") // Load .env file
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+	// Tenta carregar .env apenas em ambiente de desenvolvimento
+	if os.Getenv("ENV") != "production" {
+		if err := godotenv.Load(); err != nil {
+			log.Printf("Warning: .env file not found")
+		}
 	}
 
-	dsn := os.Getenv("DB_DSN") // Get DSN from environment variables
+	// Obtém a variável de ambiente para a conexão DSN
+	dsn := os.Getenv("DB_DSN")
 	if dsn == "" {
-		log.Fatal("DB_DSN is not set in .env file")
+		log.Fatal("DB_DSN environment variable is not set")
 	}
 
+	// Abre a conexão com o banco de dados
 	connection, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		panic("Failed to connect to database")
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
 	DB = connection
 
-	connection.AutoMigrate(&models.User{}, &models.PasswordReset{})
+	// Faz a migração automática dos modelos de User e PasswordReset
+	if err = connection.AutoMigrate(&models.User{}, &models.PasswordReset{}); err != nil {
+		log.Fatalf("Failed to auto migrate: %v", err)
+	}
+
 	fmt.Println("Database connection successful!")
 }
