@@ -1,3 +1,42 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Temporary directories
 tmp/
-main.exe
+temp/
+
+# Environment files
 .env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go specific
+vendor/
+go.sum
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+build-errors.log
