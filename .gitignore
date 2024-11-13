@@ -2,4 +2,3 @@ tmp/
 main.exe
 # Arquivos de ambiente
 .env
-app.yaml
