@@ -1,10 +1,14 @@
-# Project Login/Register User - Tutorial Fiber - Código Fluente
+# Tutorial Fiber - C&oacute;digo Fluente
 
-[Código Fluente](https://www.codigofluente.com.br/) site fiber tutorial repository
+## Login/Register User Project
+
+## [C&oacute;digo Fluente](https://www.codigofluente.com.br/)
 
 ## Description
 
 The purpose of the project is to build a login and registration user application with the stack: Fiber/Go in the backend and React in the Frontend
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/codigofluente)
 
 ## Getting Started
 ```
@@ -35,7 +39,7 @@ go run main.go
 Toti Cavalcanti
 [@toticavalcanti](toticavalcanti@hotmail.com)
 
-ex. [Código Fluente](https://www.codigofluente.com.br/)
+ex. [C&oacute;digo Fluente](https://www.codigofluente.com.br/)
 
 ## Version History
 

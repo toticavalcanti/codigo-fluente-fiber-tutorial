@@ -14,7 +14,13 @@ func main() {
 	app := fiber.New()
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
+		AllowOrigins: func() string {
+			origin := os.Getenv("CORS_ORIGIN")
+			if origin == "" {
+				return "*"
+			}
+			return origin
+		}(),
 		AllowMethods:     "GET,POST,PUT,DELETE",
 		AllowHeaders:     "Origin, Content-Type, Accept",
 		AllowCredentials: true,
