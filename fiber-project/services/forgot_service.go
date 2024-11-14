@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/smtp"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -14,36 +15,38 @@ import (
 func Forgot(c *fiber.Ctx) error {
 	var data map[string]string
 
-	// Parseia o corpo da requisição
 	if err := c.BodyParser(&data); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Invalid request data",
 		})
 	}
 
-	// Gera um token de redefinição de senha
+	// Geração de um token aleatório
 	token := RandStringRunes(12)
-
-	// Cria um registro na tabela de resets
 	passwordReset := models.PasswordReset{
-		Email: data["email"],
-		Token: token,
+		Email:     data["email"],
+		Token:     token,
+		ExpiresAt: time.Now().Add(1 * time.Hour), // Expira em 1 hora
 	}
 
-	database.DB.Create(&passwordReset)
+	// Salva no banco de dados
+	if err := database.DB.Create(&passwordReset).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error creating password reset entry",
+		})
+	}
 
-	// Configuração de autenticação SMTP para Gmail
+	// Configuração do e-mail
 	auth := smtp.PlainAuth("", os.Getenv("GMAIL_USERNAME"), os.Getenv("GMAIL_PASSWORD"), "smtp.gmail.com")
-
 	to := []string{data["email"]}
 	msg := []byte("To: " + data["email"] + "\r\n" +
-		"Subject: Redefina sua senha\r\n" +
+		"Subject: Password Reset Request\r\n" +
 		"\r\n" +
-		"Use o link para redefinir sua senha: " + os.Getenv("APP_URL") + "/reset/" + token + "\r\n")
+		"Click the link below to reset your password:\r\n" +
+		os.Getenv("APP_URL") + "/reset/" + token + "\r\n")
 
-	// Envia o e-mail usando o servidor SMTP do Gmail
-	err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_USERNAME"), to, msg)
-	if err != nil {
+	// Envia o e-mail
+	if err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_USERNAME"), to, msg); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Error sending email",
 		})
@@ -57,7 +60,6 @@ func Forgot(c *fiber.Ctx) error {
 func Reset(c *fiber.Ctx) error {
 	var data map[string]string
 
-	// Parseia o corpo da requisição
 	if err := c.BodyParser(&data); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Invalid request data",
@@ -67,34 +69,44 @@ func Reset(c *fiber.Ctx) error {
 	// Verifica se as senhas coincidem
 	if data["password"] != data["confirm_password"] {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Passwords do not match!",
+			"message": "Passwords do not match",
 		})
 	}
 
-	// Verifica o token e busca o registro correspondente
-	var passwordReset = models.PasswordReset{}
-	if err := database.DB.Where("token = ?", data["token"]).Last(&passwordReset); err.Error != nil {
+	// Verifica a validade do token
+	var passwordReset models.PasswordReset
+	if err := database.DB.Where("token = ? AND expires_at > ?", data["token"], time.Now()).Last(&passwordReset).Error; err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid token!",
+			"message": "Invalid or expired token",
 		})
 	}
 
 	// Gera o hash da nova senha
-	password, _ := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
+	password, err := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error processing password",
+		})
+	}
 
 	// Atualiza a senha do usuário
-	database.DB.Model(&models.User{}).Where("email = ?", passwordReset.Email).Update("password", password)
+	if err := database.DB.Model(&models.User{}).Where("email = ?", passwordReset.Email).Update("password", password).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Error updating password",
+		})
+	}
 
-	// Retorna uma resposta de sucesso
+	// Remove o token usado
+	database.DB.Delete(&passwordReset)
+
 	return c.JSON(fiber.Map{
 		"message": "Password successfully reset",
 	})
 }
 
-// Função auxiliar para gerar um token aleatório
+// Função auxiliar para gerar tokens aleatórios
 func RandStringRunes(n int) string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
