@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -28,14 +29,12 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validar email
 	if !emailRegex.MatchString(data["email"]) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Invalid email format",
 		})
 	}
 
-	// Verificar se email já existe
 	var existingUser models.User
 	if err := database.DB.Where("email = ?", data["email"]).First(&existingUser).Error; err == nil {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
@@ -101,7 +100,7 @@ func Login(c *fiber.Ctx) error {
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "secret" // fallback para desenvolvimento
+		jwtSecret = "secret"
 	}
 
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -117,7 +116,7 @@ func Login(c *fiber.Ctx) error {
 		Value:    token,
 		Expires:  time.Now().Add(24 * time.Hour),
 		HTTPOnly: true,
-		Secure:   os.Getenv("ENV") == "production", // HTTPS apenas em produção
+		Secure:   os.Getenv("ENV") == "production",
 		SameSite: "Lax",
 	}
 	c.Cookie(&cookie)
@@ -127,14 +126,28 @@ func Login(c *fiber.Ctx) error {
 }
 
 func User(c *fiber.Ctx) error {
-	cookie := c.Cookies("jwt")
+	var tokenString string
+
+	// Tentar pegar o token do header Authorization primeiro
+	if auth := c.Get("Authorization"); auth != "" {
+		tokenString = strings.TrimPrefix(auth, "Bearer ")
+	} else {
+		// Se não encontrar no header, tentar do cookie
+		tokenString = c.Cookies("jwt")
+	}
+
+	if tokenString == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Unauthorized",
+		})
+	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		jwtSecret = "secret"
 	}
 
-	token, err := jwt.ParseWithClaims(cookie, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(jwtSecret), nil
 	})
 
