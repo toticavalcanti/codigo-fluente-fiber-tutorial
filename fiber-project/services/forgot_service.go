@@ -1,98 +1,48 @@
 package services
 
 import (
-	"bytes"
-	"crypto/rand"
-	"encoding/hex"
 	"fiber-project/database"
 	"fiber-project/models"
-	"fmt"
-	"html/template"
+	"math/rand"
 	"net/smtp"
 	"os"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Template HTML para o email
-const emailTemplate = `
-<!DOCTYPE html>
-<html>
-<body>
-    <h2>Redefinição de Senha</h2>
-    <p>Você solicitou a redefinição de sua senha.</p>
-    <p>Clique no link abaixo para redefinir sua senha:</p>
-    <a href="{{.ResetLink}}">Redefinir Senha</a>
-    <p>Este link expira em 1 hora.</p>
-    <p>Se você não solicitou esta redefinição, ignore este email.</p>
-</body>
-</html>
-`
-
 func Forgot(c *fiber.Ctx) error {
 	var data map[string]string
 
+	// Parseia o corpo da requisição
 	if err := c.BodyParser(&data); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Invalid request data",
 		})
 	}
 
-	// Verificar se o email existe
-	var user models.User
-	if err := database.DB.Where("email = ?", data["email"]).First(&user).Error; err != nil {
-		// Não revelamos se o email existe ou não por segurança
-		return c.JSON(fiber.Map{
-			"message": "If the email exists, you will receive reset instructions",
-		})
-	}
+	// Gera um token de redefinição de senha
+	token := RandStringRunes(12)
 
-	// Gerar token seguro usando crypto/rand
-	token := generateSecureToken(32)
-
-	// Criar registro de reset com expiração
+	// Cria um registro na tabela de resets
 	passwordReset := models.PasswordReset{
-		Email:     data["email"],
-		Token:     token,
-		ExpiresAt: time.Now().Add(1 * time.Hour),
+		Email: data["email"],
+		Token: token,
 	}
 
-	if err := database.DB.Create(&passwordReset).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Error processing request",
-		})
-	}
+	database.DB.Create(&passwordReset)
 
-	// Configurar autenticação Gmail
-	auth := smtp.PlainAuth("",
-		os.Getenv("GMAIL_EMAIL"),
-		os.Getenv("GMAIL_APP_PASSWORD"),
-		"smtp.gmail.com",
-	)
+	// Configuração de autenticação SMTP para Gmail
+	auth := smtp.PlainAuth("", os.Getenv("GMAIL_USERNAME"), os.Getenv("GMAIL_PASSWORD"), "smtp.gmail.com")
 
-	// Preparar o template do email
-	resetLink := fmt.Sprintf("%s/reset/%s", os.Getenv("APP_URL"), token)
-	emailBody, err := parseEmailTemplate(emailTemplate, resetLink)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Error preparing email",
-		})
-	}
+	to := []string{data["email"]}
+	msg := []byte("To: " + data["email"] + "\r\n" +
+		"Subject: Redefina sua senha\r\n" +
+		"\r\n" +
+		"Use o link para redefinir sua senha: " + os.Getenv("APP_URL") + "/reset/" + token + "\r\n")
 
-	// Montar a mensagem de email
-	msg := buildEmailMessage(data["email"], "Redefinição de Senha", emailBody)
-
-	// Enviar email
-	err = smtp.SendMail(
-		"smtp.gmail.com:587",
-		auth,
-		os.Getenv("GMAIL_EMAIL"),
-		[]string{data["email"]},
-		msg,
-	)
-
+	// Envia o e-mail usando o servidor SMTP do Gmail
+	err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_USERNAME"), to, msg)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Error sending email",
@@ -107,89 +57,47 @@ func Forgot(c *fiber.Ctx) error {
 func Reset(c *fiber.Ctx) error {
 	var data map[string]string
 
+	// Parseia o corpo da requisição
 	if err := c.BodyParser(&data); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Invalid request data",
 		})
 	}
 
+	// Verifica se as senhas coincidem
 	if data["password"] != data["confirm_password"] {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Passwords do not match",
+			"message": "Passwords do not match!",
 		})
 	}
 
-	// Verificar token e expiração
-	var passwordReset models.PasswordReset
-	if err := database.DB.Where("token = ? AND expires_at > ?",
-		data["token"],
-		time.Now(),
-	).Last(&passwordReset).Error; err != nil {
+	// Verifica o token e busca o registro correspondente
+	var passwordReset = models.PasswordReset{}
+	if err := database.DB.Where("token = ?", data["token"]).Last(&passwordReset); err.Error != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": "Invalid or expired token",
+			"message": "Invalid token!",
 		})
 	}
 
-	// Gerar novo hash de senha
-	password, err := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Error processing password",
-		})
-	}
+	// Gera o hash da nova senha
+	password, _ := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
 
-	// Atualizar senha
-	if err := database.DB.Model(&models.User{}).
-		Where("email = ?", passwordReset.Email).
-		Update("password", password).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"message": "Error updating password",
-		})
-	}
+	// Atualiza a senha do usuário
+	database.DB.Model(&models.User{}).Where("email = ?", passwordReset.Email).Update("password", password)
 
-	// Invalidar token usado
-	database.DB.Delete(&passwordReset)
-
+	// Retorna uma resposta de sucesso
 	return c.JSON(fiber.Map{
 		"message": "Password successfully reset",
 	})
 }
 
-// Funções auxiliares
+// Função auxiliar para gerar um token aleatório
+func RandStringRunes(n int) string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func generateSecureToken(length int) string {
-	b := make([]byte, length)
-	if _, err := rand.Read(b); err != nil {
-		return ""
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
-	return hex.EncodeToString(b)
-}
-
-func parseEmailTemplate(tmpl string, resetLink string) (string, error) {
-	t, err := template.New("reset_email").Parse(tmpl)
-	if err != nil {
-		return "", err
-	}
-
-	data := struct {
-		ResetLink string
-	}{
-		ResetLink: resetLink,
-	}
-
-	var buf bytes.Buffer
-	if err := t.Execute(&buf, data); err != nil {
-		return "", err
-	}
-
-	return buf.String(), nil
-}
-
-func buildEmailMessage(to, subject, body string) []byte {
-	return []byte(fmt.Sprintf("To: %s\r\n"+
-		"Subject: %s\r\n"+
-		"MIME-Version: 1.0\r\n"+
-		"Content-Type: text/html; charset=utf-8\r\n"+
-		"\r\n"+
-		"%s", to, subject, body))
+	return string(b)
 }
