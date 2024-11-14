@@ -16,13 +16,23 @@ func main() {
 	// Configuração de CORS dinâmica
 	app.Use(cors.New(cors.Config{
 		AllowOriginsFunc: func(origin string) bool {
-			// Permite todas as origens válidas (não vazias)
 			return origin != ""
 		},
 		AllowMethods:     "GET,POST,PUT,DELETE",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowCredentials: true,
 	}))
+
+	// Middleware para servir arquivos estáticos
+	app.Static("/", "./frontend/react-auth/build")
+
+	// Middleware de fallback para React Router
+	app.Use(func(c *fiber.Ctx) error {
+		if err := c.SendFile("./frontend/react-auth/build/index.html"); err != nil {
+			return c.Status(404).SendString("Page not found")
+		}
+		return nil
+	})
 
 	// Configuração das rotas
 	routes.Setup(app)
