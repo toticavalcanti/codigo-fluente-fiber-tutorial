@@ -8,7 +8,6 @@ import (
 	"fiber-project/models"
 	"fmt"
 	"html/template"
-	"log"
 	"net/smtp"
 	"os"
 	"time"
@@ -61,7 +60,6 @@ func Forgot(c *fiber.Ctx) error {
 	}
 
 	if err := database.DB.Create(&passwordReset).Error; err != nil {
-		log.Printf("Erro ao salvar token no banco: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Error processing request",
 		})
@@ -78,7 +76,6 @@ func Forgot(c *fiber.Ctx) error {
 	resetLink := fmt.Sprintf("%s/reset/%s", os.Getenv("APP_URL"), token)
 	emailBody, err := parseEmailTemplate(emailTemplate, resetLink)
 	if err != nil {
-		log.Printf("Erro ao preparar o email: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Error preparing email",
 		})
@@ -97,13 +94,11 @@ func Forgot(c *fiber.Ctx) error {
 	)
 
 	if err != nil {
-		log.Printf("Erro ao enviar email: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Error sending email",
 		})
 	}
 
-	log.Printf("Email enviado com sucesso para %s", data["email"])
 	return c.JSON(fiber.Map{
 		"message": "If the email exists, you will receive reset instructions",
 	})
@@ -165,7 +160,6 @@ func Reset(c *fiber.Ctx) error {
 func generateSecureToken(length int) string {
 	b := make([]byte, length)
 	if _, err := rand.Read(b); err != nil {
-		log.Printf("Erro ao gerar token seguro: %v\n", err)
 		return ""
 	}
 	return hex.EncodeToString(b)
