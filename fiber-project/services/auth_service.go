@@ -169,6 +169,7 @@ func User(c *fiber.Ctx) error {
 }
 
 func Logout(c *fiber.Ctx) error {
+	// Limpa o cookie
 	cookie := fiber.Cookie{
 		Name:     "jwt",
 		Value:    "",
@@ -178,6 +179,10 @@ func Logout(c *fiber.Ctx) error {
 		SameSite: "Lax",
 	}
 	c.Cookie(&cookie)
+
+	// Limpa também o header de autorização
+	c.Request().Header.Del("Authorization")
+
 	return c.JSON(fiber.Map{
 		"message": "Successfully logged out",
 	})
