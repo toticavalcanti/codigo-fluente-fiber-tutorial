@@ -13,8 +13,10 @@ func main() {
 	database.Connect()
 	app := fiber.New()
 
+	// Configuração de CORS dinâmica
 	app.Use(cors.New(cors.Config{
 		AllowOriginsFunc: func(origin string) bool {
+			// Permite todas as origens válidas (não vazias)
 			return origin != ""
 		},
 		AllowMethods:     "GET,POST,PUT,DELETE",
@@ -22,12 +24,15 @@ func main() {
 		AllowCredentials: true,
 	}))
 
+	// Configuração das rotas
 	routes.Setup(app)
 
+	// Configuração da porta
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
 
+	// Inicialização do servidor
 	app.Listen(":" + port)
 }
