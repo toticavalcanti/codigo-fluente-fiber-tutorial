@@ -15,9 +15,9 @@ func main() {
 	app := fiber.New()
 
 	// Configuração CORS corrigida
-	frontendURL := os.Getenv("FRONTEND_URL")
+	frontendURL := os.Getenv("APP_URL")
 	if frontendURL == "" {
-		log.Fatal("FRONTEND_URL environment variable is required")
+		log.Fatal("APP_URL environment variable is required")
 	}
 
 	app.Use(cors.New(cors.Config{
