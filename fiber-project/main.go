@@ -3,7 +3,6 @@ package main
 import (
 	"fiber-project/database"
 	"fiber-project/routes"
-	"log"
 	"os"
 
 	"github.com/gofiber/fiber/v2"
@@ -11,42 +10,29 @@ import (
 )
 
 func main() {
-	// Conectar ao banco de dados
 	database.Connect()
-
-	// Inicializar o Fiber
 	app := fiber.New()
 
-	// Obter a variável de ambiente APP_URL
-	frontendURL := os.Getenv("APP_URL")
-	if frontendURL == "" {
-		log.Fatal("APP_URL environment variable is required")
-	} else {
-		log.Printf("APP_URL is set to: %s", frontendURL)
-	}
-
-	// Configuração de CORS
+	// Configuração de CORS dinâmica
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     frontendURL,
-		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+		AllowOriginsFunc: func(origin string) bool {
+			// Permite todas as origens válidas (não vazias)
+			return origin != ""
+		},
+		AllowMethods:     "GET,POST,PUT,DELETE",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowCredentials: true,
-		ExposeHeaders:    "Set-Cookie",
 	}))
 
-	// Configurar rotas
+	// Configuração das rotas
 	routes.Setup(app)
 
-	// Definir a porta
+	// Configuração da porta
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
-		log.Printf("PORT is not set. Using default port: %s", port)
+		port = "3000"
 	}
 
-	// Iniciar o servidor
-	log.Printf("Server starting on port %s", port)
-	if err := app.Listen(":" + port); err != nil {
-		log.Fatalf("Error starting server: %v", err)
-	}
+	// Inicialização do servidor
+	app.Listen(":" + port)
 }
