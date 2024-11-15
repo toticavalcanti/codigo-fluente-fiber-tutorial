@@ -11,15 +11,21 @@ import (
 )
 
 func main() {
+	// Conectar ao banco de dados
 	database.Connect()
+
+	// Inicializar o Fiber
 	app := fiber.New()
 
-	// Configuração CORS corrigida
+	// Obter a variável de ambiente APP_URL
 	frontendURL := os.Getenv("APP_URL")
 	if frontendURL == "" {
 		log.Fatal("APP_URL environment variable is required")
+	} else {
+		log.Printf("APP_URL is set to: %s", frontendURL)
 	}
 
+	// Configuração de CORS
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     frontendURL,
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
@@ -28,14 +34,18 @@ func main() {
 		ExposeHeaders:    "Set-Cookie",
 	}))
 
+	// Configurar rotas
 	routes.Setup(app)
 
+	// Definir a porta
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
+		log.Printf("PORT is not set. Using default port: %s", port)
 	}
 
-	log.Printf("Server starting on port %s\n", port)
+	// Iniciar o servidor
+	log.Printf("Server starting on port %s", port)
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
