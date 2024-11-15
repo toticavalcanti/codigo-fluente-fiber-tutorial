@@ -75,7 +75,7 @@ func Forgot(c *fiber.Ctx) error {
 	)
 
 	// Preparar o template do email
-	resetLink := fmt.Sprintf("%s/reset/%s", os.Getenv("APP_URL"), token)
+	resetLink := fmt.Sprintf("%s/reset/%s", os.Getenv("FRONTEND_URL"), token)
 	emailBody, err := parseEmailTemplate(emailTemplate, resetLink)
 	if err != nil {
 		log.Printf("Erro ao preparar o email: %v\n", err)
