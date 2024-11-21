@@ -33,7 +33,7 @@ func Forgot(c *fiber.Ctx) error {
 	database.DB.Create(&passwordReset)
 
 	// Configuração SMTP para enviar o email
-	auth := smtp.PlainAuth("", os.Getenv("GMAIL_USERNAME"), os.Getenv("GMAIL_PASSWORD"), "smtp.gmail.com")
+	auth := smtp.PlainAuth("", os.Getenv("GMAIL_USERNAME"), os.Getenv("GMAIL_APP_PASSWORD"), "smtp.gmail.com")
 
 	// Destinatário e conteúdo do email
 	to := []string{data["email"]}
