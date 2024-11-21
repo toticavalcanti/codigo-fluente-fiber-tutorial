@@ -33,7 +33,7 @@ func Forgot(c *fiber.Ctx) error {
 	database.DB.Create(&passwordReset)
 
 	// Configuração SMTP para enviar o email
-	auth := smtp.PlainAuth("", os.Getenv("GMAIL_USERNAME"), os.Getenv("GMAIL_APP_PASSWORD"), "smtp.gmail.com")
+	auth := smtp.PlainAuth("", os.Getenv("GMAIL_EMAIL"), os.Getenv("GMAIL_APP_PASSWORD"), "smtp.gmail.com")
 
 	// Destinatário e conteúdo do email
 	to := []string{data["email"]}
@@ -43,7 +43,7 @@ func Forgot(c *fiber.Ctx) error {
 		"Use o link para redefinir sua senha: " + os.Getenv("APP_URL") + "/reset/" + token + "\r\n")
 
 	// Envia o email usando o servidor SMTP do Gmail
-	err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_USERNAME"), to, msg)
+	err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_EMAIL"), to, msg)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"message": "Error sending email",
