@@ -26,11 +26,10 @@ func main() {
 
 	// Adiciona o middleware de redirecionamento para reset de senha
 	app.Use("/reset/*", func(c *fiber.Ctx) error {
-		// Só redireciona se for uma requisição GET
 		if c.Method() == "GET" {
 			token := c.Params("*")
 			frontendURL := os.Getenv("FRONTEND_URL")
-			return c.Redirect(frontendURL + "/reset/" + token)
+			return c.Redirect(frontendURL+"/reset/"+token, 301)
 		}
 		return c.Next()
 	})
