@@ -24,16 +24,6 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// Adiciona o middleware de redirecionamento para reset de senha
-	app.Use("/api/reset/*", func(c *fiber.Ctx) error {
-		if c.Method() == "GET" {
-			path := c.Path() // Pega o caminho completo incluindo /reset/ e o token
-			frontendURL := os.Getenv("FRONTEND_URL")
-			return c.Redirect(frontendURL+path, 301)
-		}
-		return c.Next()
-	})
-
 	// Configuração das rotas
 	routes.Setup(app)
 
