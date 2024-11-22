@@ -2,7 +2,6 @@ package routes
 
 import (
 	"fiber-project/controllers"
-	"os"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -32,6 +31,6 @@ func Setup(app *fiber.App) {
 		token := c.Params("token")
 
 		// Redireciona para o formulário de redefinição de senha no frontend
-		return c.Redirect(os.Getenv("APP_URL")+"/reset/"+token, 302)
+		return c.SendString("Token válido: " + token + ". Por favor, use o formulário no frontend para redefinir a senha.")
 	})
 }
