@@ -77,9 +77,11 @@ func Reset(c *fiber.Ctx) error {
 
 	// Busca o token no banco de dados
 	var passwordReset = models.PasswordReset{}
-	if err := database.DB.Where("token = ?", data["token"]).Last(&passwordReset); err.Error != nil {
+	if err := database.DB.Where("token = ?", data["token"]).Last(&passwordReset).Error; err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"message": "Invalid token!",
+			"token":   data["token"],
+			"error":   err.Error(),
 		})
 	}
 
