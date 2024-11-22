@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/smtp"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -25,9 +26,9 @@ func Forgot(c *fiber.Ctx) error {
 	// Gera um token aleatório para redefinição de senha
 	token := RandStringRunes(12)
 	passwordReset := models.PasswordReset{
-		Email: data["email"],
-		Token: token,
-		//ExpiresAt: time.Now().Add(1 * time.Hour),
+		Email:     data["email"],
+		Token:     token,
+		ExpiresAt: time.Now().Add(1 * time.Hour),
 	}
 
 	// Salva o token no banco de dados
@@ -41,7 +42,7 @@ func Forgot(c *fiber.Ctx) error {
 	msg := []byte("To: " + data["email"] + "\r\n" +
 		"Subject: Redefina sua senha\r\n" +
 		"\r\n" +
-		"Use o link para redefinir sua senha: " + os.Getenv("FRONTEND_URL") + "/reset/" + token + "\r\n")
+		"Use o link para redefinir sua senha: " + os.Getenv("APP_URL") + "/reset/" + token + "\r\n")
 
 	// Envia o email usando o servidor SMTP do Gmail
 	err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_EMAIL"), to, msg)
