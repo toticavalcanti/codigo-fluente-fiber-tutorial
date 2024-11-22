@@ -10,10 +10,7 @@ import (
 )
 
 func main() {
-	// Conectar ao banco de dados
 	database.Connect()
-
-	// Inicializar o Fiber
 	app := fiber.New()
 
 	// Configuração de CORS dinâmica
