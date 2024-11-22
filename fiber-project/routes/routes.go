@@ -8,11 +8,11 @@ import (
 )
 
 func Setup(app *fiber.App) {
-	// Rota de reset precisa estar antes do grupo /api
+	// Rota de reset com status code 307
 	app.Get("/reset/:token", func(c *fiber.Ctx) error {
 		token := c.Params("token")
 		frontendURL := os.Getenv("FRONTEND_URL")
-		return c.Redirect(frontendURL + "/reset/" + token)
+		return c.Redirect(frontendURL+"/reset/"+token, 307)
 	})
 
 	// Grupo de API
