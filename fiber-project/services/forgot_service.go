@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"net/smtp"
 	"os"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -26,9 +25,9 @@ func Forgot(c *fiber.Ctx) error {
 	// Gera um token aleatório para redefinição de senha
 	token := RandStringRunes(12)
 	passwordReset := models.PasswordReset{
-		Email:     data["email"],
-		Token:     token,
-		ExpiresAt: time.Now().Add(1 * time.Hour),
+		Email: data["email"],
+		Token: token,
+		//ExpiresAt: time.Now().Add(1 * time.Hour),
 	}
 
 	// Salva o token no banco de dados
