@@ -47,20 +47,21 @@ func Forgot(c *fiber.Ctx) error {
 }
 
 func Reset(c *fiber.Ctx) error {
-	// Log básico para debug
-	println("Rota /reset chamada")
-
-	// Token recebido pela URL
-	token := c.Params("token")
-	println("Token recebido:", token)
-
 	var data map[string]string
 
 	if err := c.BodyParser(&data); err != nil {
 		return err
 	}
 
-	// Verificação de senha
+	// Valida se o token foi enviado no corpo da requisição
+	if data["token"] == "" {
+		c.Status(400)
+		return c.JSON(fiber.Map{
+			"message": "Token is required!",
+		})
+	}
+
+	// Verifica se a senha e confirmação coincidem
 	if data["password"] != data["confirm_password"] {
 		c.Status(400)
 		return c.JSON(fiber.Map{
@@ -68,20 +69,19 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	// Buscando o token na tabela `password_resets`
+	// Busca o registro do token no banco de dados
 	var passwordReset = models.PasswordReset{}
-	if err := database.DB.Where("token = ?", token).Last(&passwordReset); err.Error != nil {
+	if err := database.DB.Where("token = ?", data["token"]).Last(&passwordReset); err.Error != nil {
 		c.Status(400)
 		return c.JSON(fiber.Map{
 			"message": "Invalid token!",
 		})
 	}
 
-	// Atualização da senha do usuário
+	// Atualiza a senha do usuário associado ao email do token
 	password, _ := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
 	database.DB.Model(&models.User{}).Where("email = ?", passwordReset.Email).Update("password", password)
 
-	// Resposta de sucesso
 	return c.JSON(fiber.Map{
 		"message": "Password successfully updated!",
 	})
