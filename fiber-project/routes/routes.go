@@ -12,7 +12,7 @@ func Setup(app *fiber.App) {
 	app.Get("/reset/:token", func(c *fiber.Ctx) error {
 		token := c.Params("token")
 		frontendURL := os.Getenv("FRONTEND_URL")
-		return c.Redirect(frontendURL+"/reset/"+token, 307)
+		return c.Redirect(frontendURL+"/#/reset/"+token, 307)
 	})
 
 	// Grupo de API
