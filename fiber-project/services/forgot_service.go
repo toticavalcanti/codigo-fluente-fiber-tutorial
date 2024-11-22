@@ -48,6 +48,8 @@ func Forgot(c *fiber.Ctx) error {
 
 func Reset(c *fiber.Ctx) error {
 	var data map[string]string
+	println("Rota /reset chamada")
+	println("Token recebido:", c.Params("token"))
 
 	if err := c.BodyParser(&data); err != nil {
 		return err
