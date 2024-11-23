@@ -62,72 +62,59 @@ func Reset(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&data); err != nil {
 		fmt.Printf("Erro ao fazer parse do body em Reset: %v\n", err)
-		return err
+		return c.Status(400).JSON(fiber.Map{
+			"message": "Invalid request data",
+		})
 	}
 
 	fmt.Printf("Dados recebidos no Reset: %+v\n", data)
 
-	// Valida se o token foi enviado no corpo da requisição
+	// Valida se o token foi enviado
 	if data["token"] == "" {
 		fmt.Println("Token não fornecido na requisição")
-		c.Status(400)
-		return c.JSON(fiber.Map{
+		return c.Status(400).JSON(fiber.Map{
 			"message": "Token is required!",
 		})
 	}
 
 	fmt.Printf("Token recebido no backend: %s\n", data["token"])
 
-	// Verifica se a senha e confirmação coincidem
-	if data["password"] != data["confirm_password"] {
-		fmt.Println("Senhas não coincidem")
-		c.Status(400)
-		return c.JSON(fiber.Map{
-			"message": "Passwords do not match!",
-		})
+	// Primeiro vamos listar todos os tokens no banco para debug
+	var allTokens []models.PasswordReset
+	if err := database.DB.Find(&allTokens).Error; err != nil {
+		fmt.Printf("Erro ao buscar tokens: %v\n", err)
 	}
+	fmt.Printf("Tokens no banco: %+v\n", allTokens)
 
-	// Busca o registro do token no banco de dados
+	// Busca o token específico
 	var passwordReset = models.PasswordReset{}
 	result := database.DB.Debug().Where("token = ?", data["token"]).Last(&passwordReset)
 
-	fmt.Printf("Resultado da busca do token: %+v\n", passwordReset)
-
 	if result.Error != nil {
-		fmt.Printf("Erro ao buscar token no banco: %v\n", result.Error)
-
-		// Vamos verificar todos os tokens no banco
-		var allResets []models.PasswordReset
-		database.DB.Find(&allResets)
-		fmt.Printf("Tokens disponíveis no banco: %+v\n", allResets)
-
-		c.Status(400)
-		return c.JSON(fiber.Map{
+		fmt.Printf("Erro ao buscar token específico: %v\n", result.Error)
+		fmt.Printf("Token não encontrado: %s\n", data["token"])
+		return c.Status(400).JSON(fiber.Map{
 			"message": "Invalid token!",
 			"error":   result.Error.Error(),
 		})
 	}
 
-	// Atualiza a senha do usuário associado ao email do token
-	password, err := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
-	if err != nil {
-		fmt.Printf("Erro ao gerar hash da senha: %v\n", err)
-		c.Status(500)
-		return c.JSON(fiber.Map{
-			"message": "Error generating password hash",
+	// Se chegou aqui, encontrou o token, continua com o resto...
+	if data["password"] != data["confirm_password"] {
+		return c.Status(400).JSON(fiber.Map{
+			"message": "Passwords do not match!",
 		})
 	}
+
+	password, _ := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
 
 	updateResult := database.DB.Model(&models.User{}).Where("email = ?", passwordReset.Email).Update("password", password)
 	if updateResult.Error != nil {
 		fmt.Printf("Erro ao atualizar senha: %v\n", updateResult.Error)
-		c.Status(500)
-		return c.JSON(fiber.Map{
+		return c.Status(500).JSON(fiber.Map{
 			"message": "Error updating password",
 		})
 	}
-
-	fmt.Printf("Senha atualizada com sucesso para o email: %s\n", passwordReset.Email)
 
 	return c.JSON(fiber.Map{
 		"message": "Password successfully updated!",
