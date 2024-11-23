@@ -29,6 +29,7 @@ func Forgot(c *fiber.Ctx) error {
 		Token:     token,
 		ExpiresAt: time.Now().Add(1 * time.Hour),
 	}
+	fmt.Printf("Token criado com expiração para: %v\n", passwordReset.ExpiresAt)
 
 	if err := database.DB.Create(&passwordReset).Error; err != nil {
 		fmt.Printf("Erro ao salvar token: %v\n", err)
@@ -91,12 +92,26 @@ func Reset(c *fiber.Ctx) error {
 
 	// Busca o registro do token no banco de dados
 	var passwordReset models.PasswordReset
-	result := database.DB.Where("token = ?", data["token"]).Select("email, token").First(&passwordReset)
+	result := database.DB.Where("token = ?", data["token"]).First(&passwordReset)
 
 	if result.Error != nil {
 		fmt.Printf("Erro ao buscar token no banco: %v\n", result.Error)
 		return c.Status(400).JSON(fiber.Map{
 			"message": "Invalid token!",
+		})
+	}
+
+	// Logs para verificar a expiração
+	fmt.Printf("Token encontrado com expiração: %v\n", passwordReset.ExpiresAt)
+	fmt.Printf("Hora atual: %v\n", time.Now())
+	fmt.Printf("Token expirado? %v\n", time.Now().After(passwordReset.ExpiresAt))
+
+	// Verifica se o token expirou
+	if time.Now().After(passwordReset.ExpiresAt) {
+		fmt.Printf("Token expirado. Expiração: %v, Agora: %v\n",
+			passwordReset.ExpiresAt, time.Now())
+		return c.Status(400).JSON(fiber.Map{
+			"message": "Token has expired",
 		})
 	}
 
@@ -123,7 +138,6 @@ func Reset(c *fiber.Ctx) error {
 		"message": "Password successfully updated!",
 	})
 }
-
 func RandStringRunes(n int) string {
 	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
