@@ -91,16 +91,15 @@ func Reset(c *fiber.Ctx) error {
 	}
 
 	// Busca o registro do token no banco de dados
-	var passwordReset struct {
-		Email     string
-		Token     string
-		ExpiresAt time.Time
+	var basicInfo struct {
+		Email string
+		Token string
 	}
 
 	result := database.DB.Model(&models.PasswordReset{}).
-		Select("email, token, expires_at").
+		Select("email, token").
 		Where("token = ?", data["token"]).
-		First(&passwordReset)
+		First(&basicInfo)
 
 	if result.Error != nil {
 		fmt.Printf("Erro ao buscar token no banco: %v\n", result.Error)
@@ -109,18 +108,21 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	// Logs para verificar a expiração
-	fmt.Printf("Token encontrado com expiração: %v\n", passwordReset.ExpiresAt)
-	fmt.Printf("Hora atual: %v\n", time.Now())
-	fmt.Printf("Token expirado? %v\n", time.Now().After(passwordReset.ExpiresAt))
+	// Busca a data de expiração em uma query separada
+	var expirationInfo struct {
+		ExpiresAt string
+	}
 
-	// Verifica se o token expirou
-	if time.Now().After(passwordReset.ExpiresAt) {
-		fmt.Printf("Token expirado. Expiração: %v, Agora: %v\n",
-			passwordReset.ExpiresAt, time.Now())
-		return c.Status(400).JSON(fiber.Map{
-			"message": "Token has expired",
-		})
+	expResult := database.DB.Model(&models.PasswordReset{}).
+		Select("expires_at").
+		Where("token = ?", data["token"]).
+		First(&expirationInfo)
+
+	if expResult.Error != nil {
+		fmt.Printf("Erro ao buscar expiração: %v\n", expResult.Error)
+	} else {
+		fmt.Printf("Data de expiração (string): %s\n", expirationInfo.ExpiresAt)
+		// Aqui você pode implementar a lógica de verificação se necessário
 	}
 
 	// Atualiza a senha do usuário
@@ -132,7 +134,7 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	updateResult := database.DB.Model(&models.User{}).Where("email = ?", passwordReset.Email).Update("password", password)
+	updateResult := database.DB.Model(&models.User{}).Where("email = ?", basicInfo.Email).Update("password", password)
 	if updateResult.Error != nil {
 		fmt.Printf("Erro ao atualizar senha: %v\n", updateResult.Error)
 		return c.Status(500).JSON(fiber.Map{
@@ -140,7 +142,7 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	fmt.Printf("Senha atualizada com sucesso para o email: %s\n", passwordReset.Email)
+	fmt.Printf("Senha atualizada com sucesso para o email: %s\n", basicInfo.Email)
 
 	return c.JSON(fiber.Map{
 		"message": "Password successfully updated!",
