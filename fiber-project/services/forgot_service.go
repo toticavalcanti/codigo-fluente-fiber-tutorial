@@ -74,8 +74,7 @@ func Reset(c *fiber.Ctx) error {
 	// Valida se o token foi enviado no corpo da requisição
 	if data["token"] == "" {
 		fmt.Println("Token não fornecido na requisição")
-		c.Status(400)
-		return c.JSON(fiber.Map{
+		return c.Status(400).JSON(fiber.Map{
 			"message": "Token is required!",
 		})
 	}
@@ -85,41 +84,27 @@ func Reset(c *fiber.Ctx) error {
 	// Verifica se a senha e confirmação coincidem
 	if data["password"] != data["confirm_password"] {
 		fmt.Println("Senhas não coincidem")
-		c.Status(400)
-		return c.JSON(fiber.Map{
+		return c.Status(400).JSON(fiber.Map{
 			"message": "Passwords do not match!",
 		})
 	}
 
 	// Busca o registro do token no banco de dados
-	var passwordReset = models.PasswordReset{}
-	result := database.DB.Debug().Where("token = ?", data["token"]).Last(&passwordReset)
-
-	fmt.Printf("Resultado da busca do token: %+v\n", passwordReset)
+	var passwordReset models.PasswordReset
+	result := database.DB.Where("token = ?", data["token"]).Select("email, token").First(&passwordReset)
 
 	if result.Error != nil {
 		fmt.Printf("Erro ao buscar token no banco: %v\n", result.Error)
-		c.Status(400)
-		return c.JSON(fiber.Map{
-			"message": "Invalid token!",
-			"error":   result.Error.Error(),
-		})
-	}
-
-	// Verifica se o token expirou
-	if time.Now().After(passwordReset.ExpiresAt) {
-		fmt.Printf("Token expirado. Expiração: %v, Agora: %v\n", passwordReset.ExpiresAt, time.Now())
 		return c.Status(400).JSON(fiber.Map{
-			"message": "Token has expired",
+			"message": "Invalid token!",
 		})
 	}
 
-	// Atualiza a senha do usuário associado ao email do token
+	// Atualiza a senha do usuário
 	password, err := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
 	if err != nil {
 		fmt.Printf("Erro ao gerar hash da senha: %v\n", err)
-		c.Status(500)
-		return c.JSON(fiber.Map{
+		return c.Status(500).JSON(fiber.Map{
 			"message": "Error generating password hash",
 		})
 	}
@@ -127,8 +112,7 @@ func Reset(c *fiber.Ctx) error {
 	updateResult := database.DB.Model(&models.User{}).Where("email = ?", passwordReset.Email).Update("password", password)
 	if updateResult.Error != nil {
 		fmt.Printf("Erro ao atualizar senha: %v\n", updateResult.Error)
-		c.Status(500)
-		return c.JSON(fiber.Map{
+		return c.Status(500).JSON(fiber.Map{
 			"message": "Error updating password",
 		})
 	}
