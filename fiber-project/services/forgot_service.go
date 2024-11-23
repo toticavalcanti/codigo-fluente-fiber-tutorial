@@ -17,7 +17,9 @@ func Forgot(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&data); err != nil {
 		fmt.Printf("Erro ao fazer parse do body em Forgot: %v\n", err)
-		return err
+		return c.Status(400).JSON(fiber.Map{
+			"message": "Invalid request data",
+		})
 	}
 
 	token := RandStringRunes(12)
@@ -26,17 +28,9 @@ func Forgot(c *fiber.Ctx) error {
 		Token: token,
 	}
 
-	result := database.DB.Create(&passwordReset)
-	if result.Error != nil {
-		fmt.Printf("Erro ao salvar token no banco: %v\n", result.Error)
-		return c.Status(500).JSON(fiber.Map{
-			"message": "Error saving token",
-		})
-	}
-
+	database.DB.Create(&passwordReset)
 	fmt.Printf("Token gerado para redefinição: %s\n", token)
 	fmt.Printf("Email do usuário: %s\n", data["email"])
-	fmt.Printf("Token salvo no banco com sucesso: %s para o email: %s\n", token, data["email"])
 
 	// Configuração de autenticação SMTP para Gmail
 	auth := smtp.PlainAuth("", os.Getenv("GMAIL_EMAIL"), os.Getenv("GMAIL_APP_PASSWORD"), "smtp.gmail.com")
@@ -53,7 +47,9 @@ func Forgot(c *fiber.Ctx) error {
 	err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_EMAIL"), to, msg)
 	if err != nil {
 		fmt.Printf("Erro ao enviar email: %v\n", err)
-		return err
+		return c.Status(500).JSON(fiber.Map{
+			"message": "Error sending email",
+		})
 	}
 
 	return c.JSON(fiber.Map{
