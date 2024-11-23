@@ -2,6 +2,7 @@ package database
 
 import (
 	"fiber-project/models"
+	"fmt"
 	"log"
 	"os"
 
@@ -40,6 +41,11 @@ func Connect() {
 
 // Função auxiliar para realizar a migração dos modelos
 func migrate(connection *gorm.DB) {
+	// Força a recriação da tabela password_resets para atualizar a estrutura
+	if err := connection.Migrator().DropTable(&models.PasswordReset{}); err != nil {
+		log.Printf("Erro ao dropar tabela password_resets: %v", err)
+	}
+
 	err := connection.AutoMigrate(
 		&models.User{},
 		&models.PasswordReset{},
@@ -49,4 +55,15 @@ func migrate(connection *gorm.DB) {
 	}
 
 	log.Println("Migração do banco de dados realizada com sucesso!")
+	// Log da estrutura da tabela para debug
+	var tableInfo []struct {
+		Field   string
+		Type    string
+		Null    string
+		Key     string
+		Default string
+		Extra   string
+	}
+	connection.Raw("DESCRIBE password_resets").Scan(&tableInfo)
+	fmt.Printf("Estrutura da tabela password_resets: %+v\n", tableInfo)
 }
