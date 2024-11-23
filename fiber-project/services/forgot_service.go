@@ -63,6 +63,7 @@ func Forgot(c *fiber.Ctx) error {
 func Reset(c *fiber.Ctx) error {
 	var data map[string]string
 
+	// Faz o parse do corpo da requisição
 	if err := c.BodyParser(&data); err != nil {
 		fmt.Printf("Erro ao fazer parse do body em Reset: %v\n", err)
 		return c.Status(400).JSON(fiber.Map{
@@ -82,7 +83,7 @@ func Reset(c *fiber.Ctx) error {
 
 	fmt.Printf("Token recebido no backend: %s\n", data["token"])
 
-	// Verifica se a senha e confirmação coincidem
+	// Verifica se a senha e a confirmação coincidem
 	if data["password"] != data["confirm_password"] {
 		fmt.Println("Senhas não coincidem")
 		return c.Status(400).JSON(fiber.Map{
@@ -91,15 +92,16 @@ func Reset(c *fiber.Ctx) error {
 	}
 
 	// Busca o registro do token no banco de dados
-	var basicInfo struct {
-		Email string
-		Token string
+	var resetInfo struct {
+		Email     string
+		Token     string
+		ExpiresAt string
 	}
 
 	result := database.DB.Model(&models.PasswordReset{}).
-		Select("email, token").
+		Select("email, token, expires_at").
 		Where("token = ?", data["token"]).
-		First(&basicInfo)
+		First(&resetInfo)
 
 	if result.Error != nil {
 		fmt.Printf("Erro ao buscar token no banco: %v\n", result.Error)
@@ -108,21 +110,25 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	// Busca a data de expiração em uma query separada
-	var expirationInfo struct {
-		ExpiresAt string
+	fmt.Printf("Data de expiração (string): %s\n", resetInfo.ExpiresAt)
+
+	// Converter a string `expires_at` para `time.Time`
+	expiresAt, err := time.Parse("2006-01-02 15:04:05", resetInfo.ExpiresAt)
+	if err != nil {
+		fmt.Printf("Erro ao parsear data de expiração: %v\n", err)
+		return c.Status(500).JSON(fiber.Map{
+			"message": "Error processing token expiration",
+		})
 	}
 
-	expResult := database.DB.Model(&models.PasswordReset{}).
-		Select("expires_at").
-		Where("token = ?", data["token"]).
-		First(&expirationInfo)
+	fmt.Printf("Data de expiração (time.Time): %v\n", expiresAt)
 
-	if expResult.Error != nil {
-		fmt.Printf("Erro ao buscar expiração: %v\n", expResult.Error)
-	} else {
-		fmt.Printf("Data de expiração (string): %s\n", expirationInfo.ExpiresAt)
-		// Aqui você pode implementar a lógica de verificação se necessário
+	// Verifica se o token expirou
+	if time.Now().After(expiresAt) {
+		fmt.Printf("Token expirado. Expiração: %v, Agora: %v\n", expiresAt, time.Now())
+		return c.Status(400).JSON(fiber.Map{
+			"message": "Token has expired",
+		})
 	}
 
 	// Atualiza a senha do usuário
@@ -134,7 +140,7 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	updateResult := database.DB.Model(&models.User{}).Where("email = ?", basicInfo.Email).Update("password", password)
+	updateResult := database.DB.Model(&models.User{}).Where("email = ?", resetInfo.Email).Update("password", password)
 	if updateResult.Error != nil {
 		fmt.Printf("Erro ao atualizar senha: %v\n", updateResult.Error)
 		return c.Status(500).JSON(fiber.Map{
@@ -142,12 +148,14 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	fmt.Printf("Senha atualizada com sucesso para o email: %s\n", basicInfo.Email)
+	fmt.Printf("Senha atualizada com sucesso para o email: %s\n", resetInfo.Email)
 
+	// Retorna sucesso
 	return c.JSON(fiber.Map{
 		"message": "Password successfully updated!",
 	})
 }
+
 func RandStringRunes(n int) string {
 	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
