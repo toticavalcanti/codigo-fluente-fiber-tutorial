@@ -26,9 +26,17 @@ func Forgot(c *fiber.Ctx) error {
 		Token: token,
 	}
 
-	database.DB.Create(&passwordReset)
+	result := database.DB.Create(&passwordReset)
+	if result.Error != nil {
+		fmt.Printf("Erro ao salvar token no banco: %v\n", result.Error)
+		return c.Status(500).JSON(fiber.Map{
+			"message": "Error saving token",
+		})
+	}
+
 	fmt.Printf("Token gerado para redefinição: %s\n", token)
 	fmt.Printf("Email do usuário: %s\n", data["email"])
+	fmt.Printf("Token salvo no banco com sucesso: %s para o email: %s\n", token, data["email"])
 
 	// Configuração de autenticação SMTP para Gmail
 	auth := smtp.PlainAuth("", os.Getenv("GMAIL_EMAIL"), os.Getenv("GMAIL_APP_PASSWORD"), "smtp.gmail.com")
@@ -85,12 +93,18 @@ func Reset(c *fiber.Ctx) error {
 
 	// Busca o registro do token no banco de dados
 	var passwordReset = models.PasswordReset{}
-	result := database.DB.Where("token = ?", data["token"]).Last(&passwordReset)
+	result := database.DB.Debug().Where("token = ?", data["token"]).Last(&passwordReset)
 
 	fmt.Printf("Resultado da busca do token: %+v\n", passwordReset)
 
 	if result.Error != nil {
 		fmt.Printf("Erro ao buscar token no banco: %v\n", result.Error)
+
+		// Vamos verificar todos os tokens no banco
+		var allResets []models.PasswordReset
+		database.DB.Find(&allResets)
+		fmt.Printf("Tokens disponíveis no banco: %+v\n", allResets)
+
 		c.Status(400)
 		return c.JSON(fiber.Map{
 			"message": "Invalid token!",
