@@ -27,27 +27,15 @@ func Forgot(c *fiber.Ctx) error {
 	passwordReset := models.PasswordReset{
 		Email:     data["email"],
 		Token:     token,
-		ExpiresAt: time.Now().Add(1 * time.Hour), // token expira em 1 hora
+		ExpiresAt: time.Now().Add(1 * time.Hour),
 	}
 
-	result := database.DB.Create(&passwordReset)
-	if result.Error != nil {
-		fmt.Printf("Erro ao salvar token no banco: %v\n", result.Error)
+	if err := database.DB.Create(&passwordReset).Error; err != nil {
+		fmt.Printf("Erro ao salvar token: %v\n", err)
 		return c.Status(500).JSON(fiber.Map{
 			"message": "Error saving token",
 		})
 	}
-
-	// Verifica se foi salvo
-	var check models.PasswordReset
-	checkResult := database.DB.Where("token = ?", token).First(&check)
-	if checkResult.Error != nil {
-		fmt.Printf("Erro ao verificar token salvo: %v\n", checkResult.Error)
-		return c.Status(500).JSON(fiber.Map{
-			"message": "Error verifying saved token",
-		})
-	}
-	fmt.Printf("Token verificado após save: %+v\n", check)
 
 	// Configuração de autenticação SMTP para Gmail
 	auth := smtp.PlainAuth("", os.Getenv("GMAIL_EMAIL"), os.Getenv("GMAIL_APP_PASSWORD"), "smtp.gmail.com")
@@ -59,8 +47,7 @@ func Forgot(c *fiber.Ctx) error {
 		"Use o link para redefinir sua senha: " + os.Getenv("APP_URL") + "/reset/" + token + "\r\n")
 
 	// Envia o email usando o servidor SMTP do Gmail
-	err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_EMAIL"), to, msg)
-	if err != nil {
+	if err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_EMAIL"), to, msg); err != nil {
 		fmt.Printf("Erro ao enviar email: %v\n", err)
 		return c.Status(500).JSON(fiber.Map{
 			"message": "Error sending email",
