@@ -91,8 +91,16 @@ func Reset(c *fiber.Ctx) error {
 	}
 
 	// Busca o registro do token no banco de dados
-	var passwordReset models.PasswordReset
-	result := database.DB.Where("token = ?", data["token"]).First(&passwordReset)
+	var passwordReset struct {
+		Email     string
+		Token     string
+		ExpiresAt time.Time
+	}
+
+	result := database.DB.Model(&models.PasswordReset{}).
+		Select("email, token, expires_at").
+		Where("token = ?", data["token"]).
+		First(&passwordReset)
 
 	if result.Error != nil {
 		fmt.Printf("Erro ao buscar token no banco: %v\n", result.Error)
