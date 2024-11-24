@@ -13,6 +13,46 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// formatosData contém os possíveis formatos de data que podem vir do banco
+var formatosData = []string{
+	"2006-01-02 15:04:05",
+	"2006-01-02T15:04:05Z",
+	"2006-01-02T15:04:05.999Z",
+	"2006-01-02T15:04:05-07:00",
+	time.RFC3339,
+	time.RFC3339Nano,
+}
+
+// parseExpirationDate tenta parsear a data usando diferentes formatos
+func parseExpirationDate(dateStr string) (time.Time, error) {
+	fmt.Printf("Tentando parsear data: %s\n", dateStr)
+
+	for _, formato := range formatosData {
+		parsedTime, err := time.Parse(formato, dateStr)
+		if err == nil {
+			fmt.Printf("Sucesso usando formato: %s\n", formato)
+			// Se necessário, converter para o timezone local
+			localTime := parsedTime.In(time.Local)
+			return localTime, nil
+		}
+		fmt.Printf("Falha com formato %s: %v\n", formato, err)
+	}
+
+	return time.Time{}, fmt.Errorf("nenhum formato conhecido funcionou para a data '%s'", dateStr)
+}
+
+// RandStringRunes gera uma string aleatória para o token
+func RandStringRunes(n int) string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
+
+// Forgot lida com a solicitação de redefinição de senha
 func Forgot(c *fiber.Ctx) error {
 	var data map[string]string
 
@@ -23,7 +63,17 @@ func Forgot(c *fiber.Ctx) error {
 		})
 	}
 
+	// Verifica se o email foi fornecido
+	if data["email"] == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"message": "Email is required",
+		})
+	}
+
+	// Gera um token aleatório
 	token := RandStringRunes(12)
+
+	// Cria o registro de redefinição de senha
 	passwordReset := models.PasswordReset{
 		Email:     data["email"],
 		Token:     token,
@@ -31,6 +81,7 @@ func Forgot(c *fiber.Ctx) error {
 	}
 	fmt.Printf("Token criado com expiração para: %v\n", passwordReset.ExpiresAt)
 
+	// Salva o token no banco de dados
 	if err := database.DB.Create(&passwordReset).Error; err != nil {
 		fmt.Printf("Erro ao salvar token: %v\n", err)
 		return c.Status(500).JSON(fiber.Map{
@@ -38,7 +89,7 @@ func Forgot(c *fiber.Ctx) error {
 		})
 	}
 
-	// Configuração de autenticação SMTP para Gmail
+	// Configuração do email
 	auth := smtp.PlainAuth("", os.Getenv("GMAIL_EMAIL"), os.Getenv("GMAIL_APP_PASSWORD"), "smtp.gmail.com")
 
 	to := []string{data["email"]}
@@ -47,7 +98,7 @@ func Forgot(c *fiber.Ctx) error {
 		"\r\n" +
 		"Use o link para redefinir sua senha: " + os.Getenv("APP_URL") + "/reset/" + token + "\r\n")
 
-	// Envia o email usando o servidor SMTP do Gmail
+	// Envia o email
 	if err := smtp.SendMail("smtp.gmail.com:587", auth, os.Getenv("GMAIL_EMAIL"), to, msg); err != nil {
 		fmt.Printf("Erro ao enviar email: %v\n", err)
 		return c.Status(500).JSON(fiber.Map{
@@ -60,10 +111,10 @@ func Forgot(c *fiber.Ctx) error {
 	})
 }
 
+// Reset lida com a atualização da senha
 func Reset(c *fiber.Ctx) error {
 	var data map[string]string
 
-	// Faz o parse do corpo da requisição
 	if err := c.BodyParser(&data); err != nil {
 		fmt.Printf("Erro ao fazer parse do body em Reset: %v\n", err)
 		return c.Status(400).JSON(fiber.Map{
@@ -73,7 +124,7 @@ func Reset(c *fiber.Ctx) error {
 
 	fmt.Printf("Dados recebidos no Reset: %+v\n", data)
 
-	// Valida se o token foi enviado no corpo da requisição
+	// Validações básicas
 	if data["token"] == "" {
 		fmt.Println("Token não fornecido na requisição")
 		return c.Status(400).JSON(fiber.Map{
@@ -81,9 +132,12 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	fmt.Printf("Token recebido no backend: %s\n", data["token"])
+	if data["password"] == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"message": "Password is required!",
+		})
+	}
 
-	// Verifica se a senha e a confirmação coincidem
 	if data["password"] != data["confirm_password"] {
 		fmt.Println("Senhas não coincidem")
 		return c.Status(400).JSON(fiber.Map{
@@ -91,7 +145,7 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	// Busca o registro do token no banco de dados
+	// Busca informações do token
 	var resetInfo struct {
 		Email     string
 		Token     string
@@ -112,8 +166,8 @@ func Reset(c *fiber.Ctx) error {
 
 	fmt.Printf("Data de expiração (string): %s\n", resetInfo.ExpiresAt)
 
-	// Converter a string `expires_at` para `time.Time`
-	expiresAt, err := time.Parse("2006-01-02 15:04:05", resetInfo.ExpiresAt)
+	// Parse da data de expiração
+	expiresAt, err := parseExpirationDate(resetInfo.ExpiresAt)
 	if err != nil {
 		fmt.Printf("Erro ao parsear data de expiração: %v\n", err)
 		return c.Status(500).JSON(fiber.Map{
@@ -131,7 +185,7 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	// Atualiza a senha do usuário
+	// Gera o hash da nova senha
 	password, err := bcrypt.GenerateFromPassword([]byte(data["password"]), 14)
 	if err != nil {
 		fmt.Printf("Erro ao gerar hash da senha: %v\n", err)
@@ -140,7 +194,11 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
-	updateResult := database.DB.Model(&models.User{}).Where("email = ?", resetInfo.Email).Update("password", password)
+	// Atualiza a senha do usuário
+	updateResult := database.DB.Model(&models.User{}).
+		Where("email = ?", resetInfo.Email).
+		Update("password", password)
+
 	if updateResult.Error != nil {
 		fmt.Printf("Erro ao atualizar senha: %v\n", updateResult.Error)
 		return c.Status(500).JSON(fiber.Map{
@@ -148,20 +206,12 @@ func Reset(c *fiber.Ctx) error {
 		})
 	}
 
+	// Remove o token usado
+	database.DB.Where("token = ?", data["token"]).Delete(&models.PasswordReset{})
+
 	fmt.Printf("Senha atualizada com sucesso para o email: %s\n", resetInfo.Email)
 
-	// Retorna sucesso
 	return c.JSON(fiber.Map{
 		"message": "Password successfully updated!",
 	})
-}
-
-func RandStringRunes(n int) string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
 }
